@@ -1,8 +1,6 @@
-../Core/Src/main.c:83:5:main	4
+../Core/Src/main.c:83:5:main	8
 ../Core/Src/main.c:163:6:HAL_TIM_IC_CaptureCallback	9
 ../Core/Src/main.c:199:20:ESC_WriteUs	3
-../Core/Src/main.c:206:24:map_u16	3
-../Core/Src/main.c:218:23:ppm_to_percent	3
 ../Core/Src/main.c:225:6:displayScreen	1
 ../Core/Src/main.c:235:6:SystemClock_Config	3
 ../Core/Src/main.c:259:13:MX_I2C1_Init	2

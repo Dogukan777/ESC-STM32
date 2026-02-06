@@ -96,7 +96,7 @@ int main(void)
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
 
   /* ESC arming: minimum pulse */
-  ESC_WriteUs(800);
+  ESC_WriteUs(1000);
   HAL_Delay(3000);
 
   /* PPM input capture start */
@@ -107,54 +107,54 @@ int main(void)
 
   displayScreen("Booting...");
   HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_1);
-
-  while (1)
-  {
+  static uint16_t thr_f    = 1000;
+  static uint16_t last_out = 1000;
+  uint32_t t_esc = 0, t_oled = 0;
+  while(1){
     uint32_t now = HAL_GetTick();
 
-    /* FAILSAFE: 150ms PPM yoksa stop */
-    if ((now - ppm_last_ms) > 150) {
-      ESC_WriteUs(800);
-      displayScreen("PPM LOST!");
-      HAL_Delay(100);
-      continue;
+    // failsafe aynen...
+
+    if (now - t_esc >= 5) {              // 5ms => 200Hz ESC update
+      t_esc = now;
+
+      uint16_t thr = ppm_ch[THROTTLE_CH_INDEX];
+      if (thr < 1000) thr = 1000;
+      if (thr > 2000) thr = 2000;
+
+      thr_f = (uint16_t)((thr_f * 19 + thr) / 20);   // daha yumuşak (0.95)
+      uint16_t out = thr_f;
+      if ((out > last_out && out - last_out <= 2) || (last_out > out && last_out - out <= 2)) {
+        out = last_out; // deadband 2us
+      }
+      last_out = out;
+
+      ESC_WriteUs(last_out);     // map etme gerek yok, direkt 1000..2000 yolla
     }
 
-    /* ---------- THROTTLE -> ESC ---------- */
-    uint16_t thr = ppm_ch[THROTTLE_CH_INDEX];  // CH3
 
-    if (thr < 1000) thr = 1000;
-    if (thr > 2000) thr = 2000;
+     /* int16_t roll_pct  = ppm_to_percent(ppm_ch[ROLL_CH_INDEX]);
+      int16_t pitch_pct = ppm_to_percent(ppm_ch[PITCH_CH_INDEX]);
+      int16_t yaw_pct   = ppm_to_percent(ppm_ch[YAW_CH_INDEX]);
 
-    uint16_t esc_us = map_u16(thr, 1000, 2000, 800, 2200);
-    ESC_WriteUs(esc_us);
+      char l1[24], l2[24], l3[24], l4[24];
 
-    /* ---------- OLED: Kanal bilgileri ---------- */
-    uint16_t roll_us  = ppm_ch[ROLL_CH_INDEX];
-    uint16_t pitch_us = ppm_ch[PITCH_CH_INDEX];
-    uint16_t yaw_us   = ppm_ch[YAW_CH_INDEX];
+      snprintf(l1, sizeof(l1), "ROLL : %4d%%", roll_pct);
+      snprintf(l2, sizeof(l2), "PITCH: %4d%%", pitch_pct);
+      snprintf(l3, sizeof(l3), "YAW  : %4d%%", yaw_pct);
+      snprintf(l4, sizeof(l4), "THR  : %4uus", last_out); // <-- motora giden
 
-    int16_t roll_pct  = ppm_to_percent(roll_us);
-    int16_t pitch_pct = ppm_to_percent(pitch_us);
-    int16_t yaw_pct   = ppm_to_percent(yaw_us);
+      SH1106_Clear();
+      SH1106_GotoXY(0, 0);   SH1106_Puts(l1, &Font_7x10, 1);
+      SH1106_GotoXY(0, 12);  SH1106_Puts(l2, &Font_7x10, 1);
+      SH1106_GotoXY(0, 24);  SH1106_Puts(l3, &Font_7x10, 1);
+      SH1106_GotoXY(0, 36);  SH1106_Puts(l4, &Font_7x10, 1);
+      SH1106_UpdateScreen();*/
 
-    char l1[24], l2[24], l3[24], l4[24];
 
-    snprintf(l1, sizeof(l1), "ROLL : %4d%%", roll_pct);
-    snprintf(l2, sizeof(l2), "PITCH: %4d%%", pitch_pct);
-    snprintf(l3, sizeof(l3), "THR  : %4u us", thr);
-    snprintf(l4, sizeof(l4), "YAW  : %4d%%", yaw_pct);
-
-    SH1106_Clear();
-    SH1106_GotoXY(0, 0);   SH1106_Puts(l1, &Font_7x10, 1);
-    SH1106_GotoXY(0, 12);  SH1106_Puts(l2, &Font_7x10, 1);
-    SH1106_GotoXY(0, 24);  SH1106_Puts(l3, &Font_7x10, 1);
-    SH1106_GotoXY(0, 36);  SH1106_Puts(l4, &Font_7x10, 1);
-    SH1106_UpdateScreen();
-
-    HAL_Delay(50); // OLED ~20Hz
   }
 }
+
 
 /**
   * @brief TIM2 input capture callback (RISING edge only)
@@ -198,8 +198,8 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 /* ---- helpers ---- */
 static inline void ESC_WriteUs(uint16_t us)
 {
-  if (us < 800)  us = 800;
-  if (us > 2200) us = 2200;
+  if (us < 1000) us = 1000;
+  if (us > 2000) us = 2000;
   __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, us);
 }
 
